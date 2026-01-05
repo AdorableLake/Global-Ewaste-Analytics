@@ -23,7 +23,7 @@
 
 To intuitively represent the position of major economies in the global e-waste landscape, I developed an interactive network graph using D3.js. Hover over the nodes to explore the corresponding data.
 
-#### **[➡️ Click here for the Interactive Visualization Demo](https://adorablelake.github.io/Global-Ewaste-Analytics/Node.html)**
+#### **[➡️ Click here for the Interactive Visualization Demo](https://AdorableLake.github.io/Global-Ewaste-Analytics/Node.html)**
 
 <div align="center">
   <a href="https://AdorableLake.github.io/Global-Ewaste-Analytics/Node.html" target="_blank">
