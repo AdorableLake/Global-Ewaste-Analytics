@@ -23,7 +23,7 @@
 
 为了直观展示各经济体在全球电子垃圾版图中的位置，我使用 D3.js 构建了一个交互式的网络关系图。将鼠标悬停在节点上可查看具体数据。
 
-#### **[➡️ 点击此处，体验交互式可视化 Demo](https://AdorableLake.github.io/Global-Ewaste-Analytics/Node.html)**
+#### **[➡️ 点击此处，体验交互式可视化 Demo](https://adorablelake.github.io/Global-Ewaste-Analytics/Node.html)**
 
 <div align="center">
   <a href="https://AdorableLake.github.io/Global-Ewaste-Analytics/Node.html" target="_blank">
