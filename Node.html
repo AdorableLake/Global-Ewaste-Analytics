@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>E-waste Entities by Continent (Force Directed)</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        body { font-family: 'Trebuchet MS'; }
+        .node circle {
+            stroke: #fff;
+            stroke-width: 1.5px;
+            cursor: pointer; /* Indicate interactivity */
+        }
+        .node text {
+            font-size: 10px;
+            pointer-events: none; /* Text shouldn't block mouse events on circle */
+            text-anchor: middle;
+            dy: 0.35em; /* Vertical centering */
+        }
+        .link {
+            stroke: #999;
+            stroke-opacity: 0.6;
+        }
+        .tooltip {
+            position: absolute;
+            text-align: left; /* Changed alignment */
+            padding: 8px;
+            font: 12px Trebuchet MS;
+            background: rgba(200, 200, 200, 0.8); /* Semi-transparent */
+            border: 0px;
+            border-radius: 4px;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.2s;
+            max-width: 200px; /* Limit width */
+        }
+        .legend rect {
+             stroke-width: 1;
+             stroke: #ccc;
+         }
+         .legend text {
+             font-size: 12px;
+         }
+    </style>
+</head>
+<body>
+    <h1>E-waste Entities Grouped by Continent (2022 Data)</h1>
+    <div id="network-chart"></div>
+
+    <script>
+        // --- 1. Data Preparation (保持不变) ---
+        const nodeData = [
+             { id: "Nigeria", name: "Nigeria", group: "Africa", value: 2.3, pop: 215.9 },
+            { id: "South Africa", name: "S. Africa", group: "Africa", value: 8.8, pop: 59.6 },
+            { id: "Egypt", name: "Egypt", group: "Africa", value: 6.3, pop: 110.1 },
+            { id: "USA", name: "USA", group: "Americas", value: 21.3, pop: 337.5 },
+            { id: "Canada", name: "Canada", group: "Americas", value: 20.2, pop: 38.3 },
+            { id: "Brazil", name: "Brazil", group: "Americas", value: 11.4, pop: 214.8 },
+            { id: "Mexico", name: "Mexico", group: "Americas", value: 11.8, pop: 127.0 },
+            { id: "China", name: "China", group: "Asia", value: 8.5, pop: 1425.9 },
+            { id: "India", name: "India", group: "Asia", value: 2.9, pop: 1412.3 },
+            { id: "Japan", name: "Japan", group: "Asia", value: 21.2, pop: 124.3 },
+            { id: "South Korea", name: "S. Korea", group: "Asia", value: 17.9, pop: 51.8 },
+            { id: "Indonesia", name: "Indonesia", group: "Asia", value: 6.9, pop: 274.6 },
+            { id: "Germany", name: "Germany", group: "Europe", value: 21.2, pop: 83.4 },
+            { id: "UK", name: "UK", group: "Europe", value: 24.5, pop: 67.4 },
+            { id: "France", name: "France", group: "Europe", value: 22.4, pop: 64.6 },
+            { id: "Italy", name: "Italy", group: "Europe", value: 19.0, pop: 59.1 },
+            { id: "Spain", name: "Spain", group: "Europe", value: 19.6, pop: 47.6 },
+            { id: "Australia", name: "Australia", group: "Oceania", value: 22.4, pop: 26.0 },
+            { id: "New Zealand", name: "NZ", group: "Oceania", value: 19.6, pop: 5.2 }
+        ];
+
+        // Links (只在同组内创建链接，这是分组的基础)
+        const linkData = [];
+        const groups = [...new Set(nodeData.map(d => d.group))]; 
+        groups.forEach(group => {
+            const groupNodes = nodeData.filter(d => d.group === group);
+            for (let i = 0; i < groupNodes.length; i++) {
+                for (let j = i + 1; j < groupNodes.length; j++) {
+                    // <<< 修改：增加 strength 属性，让组内链接强一些 >>>
+                    linkData.push({ source: groupNodes[i].id, target: groupNodes[j].id, value: 1, strength_modifier: 1.5 }); 
+                }
+            }
+        });
+        const dataset = { nodes: nodeData, links: linkData };
+
+        // --- 2. Setup SVG Canvas ---
+        const width = 900;
+        const height = 600;
+        const svg = d3.select("#network-chart")
+          .append("svg")
+            .attr("width", width)
+            .attr("height", height)
+            .attr("viewBox", [0, 0, width, height])
+            .attr("style", "max-width: 100%; height: auto;");
+
+        // --- 3. Define Scales & Colors ---
+        const maxPop = d3.max(dataset.nodes, d => d.pop) || 1; 
+        // <<< 修改：显著增大节点半径范围 >>>
+        const radiusScale = d3.scaleSqrt()
+            .domain([0, maxPop])
+            .range([8, 65]); // 例如：最小半径8，最大半径65
+
+        const colorScale = d3.scaleOrdinal(d3.schemeCategory10)
+            .domain(groups);
+
+        // --- 4. Force Simulation ---
+        // <<< 修改：调整力参数以增强分组并适应大节点 >>>
+        const simulation = d3.forceSimulation(dataset.nodes)
+            .force("link", d3.forceLink(dataset.links).id(d => d.id)
+                .distance(40) // <<< 修改：可以稍微调整距离
+                // <<< 修改：让链接强度基于我们添加的 modifier >>>
+                .strength(link => (link.strength_modifier || 1) * 0.15) // 基础强度0.15，组内乘以1.5
+            ) 
+            // <<< 修改：减弱排斥力，让节点可以靠得更近，组内引力占主导 >>>
+            .force("charge", d3.forceManyBody().strength(-80)) // 尝试更小的负值（更弱的排斥）或更大的负值（更强的排斥）进行调试
+            // <<< 新增：添加 X 和 Y 方向的定位力，将不同分组拉向不同的目标点，强制分组 >>>
+            .force("x", d3.forceX(d => { // 根据分组决定 X 目标位置
+                if (d.group === "Asia") return width * 0.7;
+                if (d.group === "Europe") return width * 0.3;
+                if (d.group === "Americas") return width * 0.5;
+                if (d.group === "Africa") return width * 0.3; 
+                if (d.group === "Oceania") return width * 0.7;
+                return width / 2; // 默认居中
+            }).strength(0.08)) // 这个力不能太强，否则会覆盖其他力
+            .force("y", d3.forceY(d => { // 根据分组决定 Y 目标位置
+                if (d.group === "Asia") return height * 0.3;
+                if (d.group === "Europe") return height * 0.3;
+                if (d.group === "Americas") return height * 0.7;
+                if (d.group === "Africa") return height * 0.7;
+                if (d.group === "Oceania") return height * 0.7;
+                return height / 2;
+            }).strength(0.08))
+            .force("center", d3.forceCenter(width / 2, height / 2).strength(0.01)) // 稍微减弱中心力，让 X/Y 力主导
+             // <<< 修改：碰撞力半径要根据新的、更大的 radiusScale 调整 >>>
+            .force("collide", d3.forceCollide().radius(d => radiusScale(d.pop) + 5)); // 增大碰撞间距
+
+        // --- 5. Draw Links ---
+        const link = svg.append("g")
+            .attr("class", "links")
+            .selectAll("line")
+            .data(dataset.links)
+            .join("line")
+            .attr("class", "link");
+
+        // --- 6. Draw Nodes ---
+        const node = svg.append("g")
+            .attr("class", "nodes")
+            .selectAll("g") 
+            .data(dataset.nodes)
+            .join("g")
+            .attr("class", "node")
+            .call(drag(simulation)); 
+
+        node.append("circle")
+            .attr("r", d => radiusScale(d.pop)) // 使用更新后的半径比例尺
+            .attr("fill", d => colorScale(d.group)); 
+
+        // <<< 修改：文字放在圆圈中心，只有非常大的圆圈才显示 >>>
+        node.append("text")
+            .text(d => d.name) 
+            .attr("x", 0) 
+            .attr("y", 0) // 文字回到中心
+            .style("fill", "#fff") // <<< 修改：白色文字在彩色圆圈上更清晰
+            .style("font-weight", "bold") // 加粗一点
+            .style("display", d => radiusScale(d.pop) > 20 ? "block" : "none"); // <<< 修改：只在半径大于20的节点上显示文字
+
+
+         // --- 7. Tooltip Setup ---
+         const tooltip = d3.select("body").append("div")
+            .attr("class", "tooltip");
+
+         node.on("mouseover", function(event, d) {
+             tooltip.style("opacity", 1);
+             d3.select(this).select("circle").style("stroke", "black");
+         })
+         .on("mousemove", function(event, d) {
+             tooltip
+                 .html(`<b>${d.name} (${d.group})</b><br>
+                        Pop: ${d.pop.toFixed(1)} M<br>
+                        E-waste Gen: ${d.value.toFixed(1)} kg/cap`)
+                 .style("left", (event.pageX + 15) + "px")
+                 .style("top", (event.pageY - 28) + "px");
+         })
+         .on("mouseleave", function(event, d) {
+             tooltip.style("opacity", 0);
+             d3.select(this).select("circle").style("stroke", "#fff");
+         });
+            
+        // --- 8. Simulation Ticks ---
+        simulation.on("tick", () => {
+            link
+                .attr("x1", d => d.source.x)
+                .attr("y1", d => d.source.y)
+                .attr("x2", d => d.target.x)
+                .attr("y2", d => d.target.y);
+
+            node
+                .attr("transform", d => `translate(${d.x},${d.y})`); // Apply transform to the group
+        });
+
+        // --- 9. Drag Function ---
+        function drag(simulation) {
+          function dragstarted(event, d) {
+            if (!event.active) simulation.alphaTarget(0.3).restart();
+            d.fx = d.x;
+            d.fy = d.y;
+          }
+          function dragged(event, d) {
+            d.fx = event.x;
+            d.fy = event.y;
+          }
+          function dragended(event, d) {
+            if (!event.active) simulation.alphaTarget(0);
+            d.fx = null;
+            d.fy = null;
+          }
+          return d3.drag()
+              .on("start", dragstarted)
+              .on("drag", dragged)
+              .on("end", dragended);
+        }
+
+        // --- 10. Legend ---
+         const legend = svg.append("g")
+            .attr("class", "legend")
+            .attr("transform", `translate(${width - 120}, 20)`); // Position top right
+
+        const legendItem = legend.selectAll("g")
+          .data(groups) // Use continent names for legend
+          .join("g")
+            .attr("transform", (d, i) => `translate(0, ${i * 20})`);
+
+        legendItem.append("rect")
+            .attr("x", 0)
+            .attr("width", 18)
+            .attr("height", 18)
+            .attr("fill", d => colorScale(d));
+
+        legendItem.append("text")
+            .attr("x", 24)
+            .attr("y", 9)
+            .attr("dy", "0.35em")
+            .text(d => d);
+
+    </script>
+</body>
+</html>
